@@ -1,0 +1,16 @@
+const express = require('express');
+const notificationController = require('./notification.controller');
+const { protect } = require('../../middlewares/auth.middleware');
+const validate = require('../../middlewares/validation.middleware');
+const { validateCreateNotification } = require('./notification.validation');
+
+const router = express.Router();
+
+router.use(protect);
+
+router.post('/', validate(validateCreateNotification), notificationController.createNotification);
+router.get('/', notificationController.getUserNotifications);
+router.patch('/read-all', notificationController.markAllAsRead);
+router.patch('/:id/read', notificationController.markAsRead);
+
+module.exports = router;
