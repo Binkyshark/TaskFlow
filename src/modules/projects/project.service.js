@@ -1,6 +1,7 @@
-const Project = require('./project.model');
+const { Project } = require('./project.model');
 const { getPagination, getPagingData } = require('../../utils/pagination');
-
+const { User } = require('../users/user.model');
+const mongoose = require('mongoose');
 class ProjectService {
   /**
    * Create a new project
@@ -53,6 +54,12 @@ class ProjectService {
    * Get project details by ID
    */
   async getProjectById(projectId, userId) {
+    if (!mongoose.Types.ObjectId.isValid(projectId)) {
+      const error = new Error('Invalid project ID');
+      error.statusCode = 400;
+      throw error;
+    }
+
     const project = await Project.findById(projectId)
       .populate('owner', 'name email avatar')
       .populate('members.user', 'name email avatar');
@@ -64,8 +71,11 @@ class ProjectService {
     }
 
     // Check access
-    const isMember = project.owner._id.toString() === userId.toString() ||
-      project.members.some(m => m.user._id.toString() === userId.toString());
+    const isMember =
+      project.owner._id.toString() === userId.toString() ||
+      project.members.some(
+        m => m.user._id.toString() === userId.toString()
+      );
 
     if (!isMember) {
       const error = new Error('Not authorized to access this project');
@@ -75,6 +85,7 @@ class ProjectService {
 
     return project;
   }
+
 
   /**
    * Update project details
@@ -90,7 +101,18 @@ class ProjectService {
       throw error;
     }
 
-    Object.assign(project, updateData);
+    // Object.assign(project, updateData);
+    if (updateData.name !== undefined) {
+      project.name = updateData.name;
+    }
+
+    if (updateData.description !== undefined) {
+      project.description = updateData.description;
+    }
+
+    if (updateData.isArchived !== undefined) {
+      project.isArchived = updateData.isArchived;
+    }
     await project.save();
     return project;
   }
@@ -112,7 +134,7 @@ class ProjectService {
       throw error;
     }
 
-    await Project.findByIdAndDelete(projectId);
+    await project.deleteOne();
     return { message: 'Project deleted successfully' };
   }
 
@@ -121,7 +143,26 @@ class ProjectService {
    */
   async addMember(projectId, userId, targetUserId, role = 'member') {
     const project = await this.getProjectById(projectId, userId);
+    const memberRole = project.members.find(
+      m => m.user._id.toString() === userId.toString()
+    )?.role;
 
+    if (
+      project.owner._id.toString() !== userId.toString() &&
+      memberRole !== 'admin'
+    ) {
+      const error = new Error('Only project admins can add members');
+      error.statusCode = 403;
+      throw error;
+    }
+
+    const user = await User.findById(targetUserId);
+
+    if (!user) {
+      const error = new Error('User not found');
+      error.statusCode = 404;
+      throw error;
+    }
     const isAlreadyMember = project.members.some(m => m.user._id.toString() === targetUserId.toString());
     if (isAlreadyMember) {
       const error = new Error('User is already a member of this project');
@@ -143,10 +184,30 @@ class ProjectService {
    */
   async removeMember(projectId, userId, targetUserId) {
     const project = await this.getProjectById(projectId, userId);
+    const memberRole = project.members.find(
+      m => m.user._id.toString() === userId.toString()
+    )?.role;
 
+    if (
+      project.owner._id.toString() !== userId.toString() &&
+      memberRole !== 'admin'
+    ) {
+      const error = new Error('Only project admins can remove members');
+      error.statusCode = 403;
+      throw error;
+    }
     if (project.owner._id.toString() === targetUserId.toString()) {
       const error = new Error('Cannot remove the project owner');
       error.statusCode = 400;
+      throw error;
+    }
+    const memberExists = project.members.some(
+      m => m.user._id.toString() === targetUserId.toString()
+    );
+
+    if (!memberExists) {
+      const error = new Error('Member not found');
+      error.statusCode = 404;
       throw error;
     }
 
