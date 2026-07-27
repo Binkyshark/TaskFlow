@@ -1,48 +1,86 @@
 const Board = require('./board.model');
 const projectService = require('../projects/project.service');
 
+const BOARD_POPULATE = [
+  {
+    path: 'createdBy',
+    select: 'fullName email'
+  },
+  {
+    path: 'project',
+    select: 'name'
+  }
+];
+
 class BoardService {
   /**
-   * Create a new board in a project
+   * Create a new board
    */
-  async createBoard(userId, data) {
-    const { title, projectId, description } = data;
+  async createBoard(projectId, userId, data) {
+    const { title, description } = data;
 
     // Verify user access to the project
     await projectService.getProjectById(projectId, userId);
+
+    // Prevent duplicate board titles in the same project
+    const existingBoard = await Board.findOne({
+      project: projectId,
+      title
+    });
+
+    if (existingBoard) {
+      const error = new Error('Board title already exists');
+      error.statusCode = 409;
+      throw error;
+    }
+
+    // Get next board position
+    const lastBoard = await Board.findOne({
+      project: projectId
+    }).sort({ position: -1 });
+
+    const position = lastBoard ? lastBoard.position + 1 : 0;
 
     const board = await Board.create({
       title,
       description,
       project: projectId,
-      createdBy: userId
+      createdBy: userId,
+      position
     });
 
-    return board.populate([
-      { path: 'createdBy', select: 'name email avatar' },
-      { path: 'project', select: 'name' }
-    ]);
+    return board.populate(BOARD_POPULATE);
   }
 
   /**
-   * Get all boards for a specific project
+   * Get all boards for a project
    */
   async getBoardsByProject(projectId, userId) {
-    // Verify user access to the project
+    // Verify user access
     await projectService.getProjectById(projectId, userId);
 
-    return Board.find({ project: projectId })
-      .populate('createdBy', 'name email avatar')
-      .sort({ position: 1, createdAt: 1 });
+    return Board.find({
+      project: projectId
+    })
+      .populate(BOARD_POPULATE)
+      .sort({
+        position: 1,
+        createdAt: 1
+      });
   }
 
   /**
-   * Get single board details
+   * Get board by id
    */
   async getBoardById(boardId, userId) {
     const board = await Board.findById(boardId)
-      .populate('createdBy', 'name email avatar')
-      .populate('project', 'name owner members');
+      .populate([
+        ...BOARD_POPULATE,
+        {
+          path: 'project',
+          select: 'name owner members'
+        }
+      ]);
 
     if (!board) {
       const error = new Error('Board not found');
@@ -50,8 +88,8 @@ class BoardService {
       throw error;
     }
 
-    // Check user access to the project associated with this board
-    await projectService.getProjectById(board.project._id, userId);
+    // Verify user access to the project
+    await projectService.getProjectById(board.project.id, userId);
 
     return board;
   }
@@ -62,9 +100,25 @@ class BoardService {
   async updateBoard(boardId, userId, updateData) {
     const board = await this.getBoardById(boardId, userId);
 
-    Object.assign(board, updateData);
+    if (updateData.title !== undefined) {
+      board.title = updateData.title;
+    }
+
+    if (updateData.description !== undefined) {
+      board.description = updateData.description;
+    }
+
+    if (updateData.position !== undefined) {
+      board.position = updateData.position;
+    }
+
+    if (updateData.isArchived !== undefined) {
+      board.isArchived = updateData.isArchived;
+    }
+
     await board.save();
-    return board;
+
+    return board.populate(BOARD_POPULATE);
   }
 
   /**
@@ -73,8 +127,7 @@ class BoardService {
   async deleteBoard(boardId, userId) {
     const board = await this.getBoardById(boardId, userId);
 
-    await Board.findByIdAndDelete(board._id);
-    return { message: 'Board deleted successfully' };
+    await board.deleteOne();
   }
 }
 

@@ -1,10 +1,16 @@
+
 const boardService = require('./board.service');
 const catchAsync = require('../../utils/catchAsync');
 const { sendResponse } = require('../../utils/response');
 
 class BoardController {
   createBoard = catchAsync(async (req, res) => {
-    const board = await boardService.createBoard(req.user.id, req.body);
+    const board = await boardService.createBoard(
+      req.params.projectId,
+      req.user.id,
+      req.body
+    );
+
     return sendResponse(res, {
       statusCode: 201,
       message: 'Board created successfully',
@@ -13,14 +19,11 @@ class BoardController {
   });
 
   getBoardsByProject = catchAsync(async (req, res) => {
-    const { projectId } = req.query;
-    if (!projectId) {
-      return res.status(400).json({
-        success: false,
-        message: 'projectId query parameter is required'
-      });
-    }
-    const boards = await boardService.getBoardsByProject(projectId, req.user.id);
+    const boards = await boardService.getBoardsByProject(
+      req.params.projectId,
+      req.user.id
+    );
+
     return sendResponse(res, {
       statusCode: 200,
       message: 'Boards retrieved successfully',
@@ -29,7 +32,11 @@ class BoardController {
   });
 
   getBoardById = catchAsync(async (req, res) => {
-    const board = await boardService.getBoardById(req.params.id, req.user.id);
+    const board = await boardService.getBoardById(
+      req.params.boardId,
+      req.user.id
+    );
+
     return sendResponse(res, {
       statusCode: 200,
       message: 'Board retrieved successfully',
@@ -38,7 +45,12 @@ class BoardController {
   });
 
   updateBoard = catchAsync(async (req, res) => {
-    const board = await boardService.updateBoard(req.params.id, req.user.id, req.body);
+    const board = await boardService.updateBoard(
+      req.params.boardId,
+      req.user.id,
+      req.body
+    );
+
     return sendResponse(res, {
       statusCode: 200,
       message: 'Board updated successfully',
@@ -47,10 +59,14 @@ class BoardController {
   });
 
   deleteBoard = catchAsync(async (req, res) => {
-    const result = await boardService.deleteBoard(req.params.id, req.user.id);
+    await boardService.deleteBoard(
+      req.params.boardId,
+      req.user.id
+    );
+
     return sendResponse(res, {
       statusCode: 200,
-      message: result.message
+      message: 'Board deleted successfully'
     });
   });
 }
