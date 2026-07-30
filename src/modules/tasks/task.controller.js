@@ -4,7 +4,12 @@ const { sendResponse } = require('../../utils/response');
 
 class TaskController {
   createTask = catchAsync(async (req, res) => {
-    const task = await taskService.createTask(req.user.id, req.body);
+    const task = await taskService.createTask(
+      req.params.listId,
+      req.user.id,
+      req.body
+    );
+
     return sendResponse(res, {
       statusCode: 201,
       message: 'Task created successfully',
@@ -13,7 +18,12 @@ class TaskController {
   });
 
   getTasks = catchAsync(async (req, res) => {
-    const { tasks, meta } = await taskService.getTasks(req.user.id, req.query);
+    const { tasks, meta } = await taskService.getTasks(
+      req.params.listId,
+      req.user.id,
+      req.query
+    );
+
     return sendResponse(res, {
       statusCode: 200,
       message: 'Tasks retrieved successfully',
@@ -23,7 +33,11 @@ class TaskController {
   });
 
   getTaskById = catchAsync(async (req, res) => {
-    const task = await taskService.getTaskById(req.params.id, req.user.id);
+    const task = await taskService.getTaskById(
+      req.params.id,
+      req.user.id
+    );
+
     return sendResponse(res, {
       statusCode: 200,
       message: 'Task retrieved successfully',
@@ -32,7 +46,12 @@ class TaskController {
   });
 
   updateTask = catchAsync(async (req, res) => {
-    const task = await taskService.updateTask(req.params.id, req.user.id, req.body);
+    const task = await taskService.updateTask(
+      req.params.id,
+      req.user.id,
+      req.body
+    );
+
     return sendResponse(res, {
       statusCode: 200,
       message: 'Task updated successfully',
@@ -41,7 +60,11 @@ class TaskController {
   });
 
   deleteTask = catchAsync(async (req, res) => {
-    const result = await taskService.deleteTask(req.params.id, req.user.id);
+    const result = await taskService.deleteTask(
+      req.params.id,
+      req.user.id
+    );
+
     return sendResponse(res, {
       statusCode: 200,
       message: result.message

@@ -7,14 +7,49 @@ const {
   validateUpdateTask
 } = require('./task.validation');
 
-const router = express.Router();
+const router = express.Router({
+  mergeParams: true
+});
 
 router.use(protect);
 
-router.post('/', validate(validateCreateTask), taskController.createTask);
-router.get('/', taskController.getTasks);
-router.get('/:id', taskController.getTaskById);
-router.patch('/:id', validate(validateUpdateTask), taskController.updateTask);
-router.delete('/:id', taskController.deleteTask);
+/*
+|--------------------------------------------------------------------------
+| Nested Routes
+|--------------------------------------------------------------------------
+*/
+
+router.post(
+  '/',
+  validate(validateCreateTask),
+  taskController.createTask
+);
+
+router.get(
+  '/',
+  taskController.getTasks
+);
+
+/*
+|--------------------------------------------------------------------------
+| Standalone Routes
+|--------------------------------------------------------------------------
+*/
+
+router.get(
+  '/:id',
+  taskController.getTaskById
+);
+
+router.patch(
+  '/:id',
+  validate(validateUpdateTask),
+  taskController.updateTask
+);
+
+router.delete(
+  '/:id',
+  taskController.deleteTask
+);
 
 module.exports = router;

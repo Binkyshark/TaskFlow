@@ -31,5 +31,7 @@ router.use('/comments', commentRoutes);
 router.use('/attachments', attachmentRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/lists', listRoutes);
+router.use('/lists/:listId/tasks', taskRoutes);
 
+router.use('/tasks', taskRoutes);
 module.exports = router;

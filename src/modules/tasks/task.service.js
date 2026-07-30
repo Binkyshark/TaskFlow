@@ -1,87 +1,145 @@
-const Task = require('./task.model');
+const mongoose = require('mongoose');
+const { Task } = require('./task.model');
 const listService = require('../lists/list.service');
-const boardService = require('../boards/board.service');
 const { getPagination, getPagingData } = require('../../utils/pagination');
+
+const TASK_POPULATE = [
+  {
+    path: 'createdBy',
+    select: 'name email avatar'
+  },
+  {
+    path: 'assignees',
+    select: 'name email avatar'
+  },
+  {
+    path: 'list',
+    select: 'title'
+  }
+];
 
 class TaskService {
   /**
-   * Create a task inside a list
+   * Create Task
    */
-  async createTask(userId, data) {
-    const { title, listId, description, priority, assignees, dueDate, position } = data;
+  async createTask(listId, userId, data) {
+    const {
+      title,
+      description,
+      priority,
+      assignees,
+      dueDate,
+      labels,
+      position
+    } = data;
 
-    // Verify parent list exists and user has board/project access
-    const list = await listService.getListById(listId, userId);
+    // Verify access to list
+    await listService.getListById(listId, userId);
+
+    const exists = await Task.findOne({
+      list: listId,
+      title
+    });
+
+    if (exists) {
+      const error = new Error('Task title already exists');
+      error.statusCode = 409;
+      throw error;
+    }
 
     let taskPosition = position;
-    if (taskPosition === undefined || taskPosition === 0) {
-      const count = await Task.countDocuments({ list: listId });
-      taskPosition = count;
+
+    if (taskPosition === undefined) {
+      taskPosition = await Task.countDocuments({
+        list: listId
+      });
     }
 
     const task = await Task.create({
       title,
       description,
       list: listId,
-      board: list.board,
-      project: (await boardService.getBoardById(list.board, userId)).project._id,
-      assignees,
       createdBy: userId,
+      assignees,
       priority,
+      labels,
       dueDate,
       position: taskPosition
     });
 
-    return task.populate([
-      { path: 'createdBy', select: 'name email avatar' },
-      { path: 'assignees', select: 'name email avatar' }
-    ]);
+    return task.populate(TASK_POPULATE);
   }
 
   /**
-   * Get tasks with filtering (by list, board, project, or assignee)
+   * Get Tasks By List
    */
-  async getTasks(userId, query) {
-    const { page, limit, skip } = getPagination(query);
-    const filter = {};
+  async getTasks(listId, userId, query) {
+    await listService.getListById(listId, userId);
 
-    if (query.listId) filter.list = query.listId;
-    if (query.boardId) filter.board = query.boardId;
-    if (query.projectId) filter.project = query.projectId;
-    if (query.assigneeId) filter.assignees = query.assigneeId;
-    if (query.priority) filter.priority = query.priority;
-    if (query.isCompleted !== undefined) filter.isCompleted = query.isCompleted === 'true';
+    const { page, limit, skip } = getPagination(query);
+
+    const filter = {
+      list: listId
+    };
+
+    if (query.priority) {
+      filter.priority = query.priority;
+    }
+
+    if (query.assigneeId) {
+      filter.assignees = query.assigneeId;
+    }
+
+    if (query.isArchived !== undefined) {
+      filter.isArchived = query.isArchived === 'true';
+    }
 
     if (query.search) {
       filter.$or = [
-        { title: { $regex: query.search, $options: 'i' } },
-        { description: { $regex: query.search, $options: 'i' } }
+        {
+          title: {
+            $regex: query.search,
+            $options: 'i'
+          }
+        },
+        {
+          description: {
+            $regex: query.search,
+            $options: 'i'
+          }
+        }
       ];
     }
 
     const [tasks, total] = await Promise.all([
       Task.find(filter)
-        .populate('createdBy', 'name email avatar')
-        .populate('assignees', 'name email avatar')
-        .populate('list', 'title')
+        .populate(TASK_POPULATE)
         .skip(skip)
         .limit(limit)
-        .sort({ position: 1, createdAt: -1 }),
+        .sort({
+          position: 1,
+          createdAt: -1
+        }),
       Task.countDocuments(filter)
     ]);
 
-    const meta = getPagingData(total, page, limit);
-    return { tasks, meta };
+    return {
+      tasks,
+      meta: getPagingData(total, page, limit)
+    };
   }
 
   /**
-   * Get single task details
+   * Get Task By Id
    */
   async getTaskById(taskId, userId) {
-    const task = await Task.findById(taskId)
-      .populate('createdBy', 'name email avatar')
-      .populate('assignees', 'name email avatar')
-      .populate('list', 'title board');
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      const error = new Error('Invalid task ID');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const task = await Task.findById(taskId).populate(TASK_POPULATE);
 
     if (!task) {
       const error = new Error('Task not found');
@@ -89,42 +147,86 @@ class TaskService {
       throw error;
     }
 
-    await boardService.getBoardById(task.board, userId);
+    await listService.getListById(task.list._id, userId);
 
     return task;
   }
 
   /**
-   * Update task details or move list/position
+   * Update Task
    */
   async updateTask(taskId, userId, updateData) {
     const task = await this.getTaskById(taskId, userId);
 
     if (updateData.listId) {
-      const newList = await listService.getListById(updateData.listId, userId);
+      const newList = await listService.getListById(
+        updateData.listId,
+        userId
+      );
+
       task.list = newList._id;
-      task.board = newList.board;
     }
 
-    delete updateData.listId;
-    Object.assign(task, updateData);
+    if (updateData.title !== undefined) {
+      const duplicate = await Task.findOne({
+        _id: { $ne: task._id },
+        list: task.list,
+        title: updateData.title
+      });
+
+      if (duplicate) {
+        const error = new Error('Task title already exists');
+        error.statusCode = 409;
+        throw error;
+      }
+
+      task.title = updateData.title;
+    }
+
+    if (updateData.description !== undefined) {
+      task.description = updateData.description;
+    }
+
+    if (updateData.priority !== undefined) {
+      task.priority = updateData.priority;
+    }
+
+    if (updateData.assignees !== undefined) {
+      task.assignees = updateData.assignees;
+    }
+
+    if (updateData.labels !== undefined) {
+      task.labels = updateData.labels;
+    }
+
+    if (updateData.dueDate !== undefined) {
+      task.dueDate = updateData.dueDate;
+    }
+
+    if (updateData.position !== undefined) {
+      task.position = updateData.position;
+    }
+
+    if (updateData.isArchived !== undefined) {
+      task.isArchived = updateData.isArchived;
+    }
 
     await task.save();
-    return task.populate([
-      { path: 'createdBy', select: 'name email avatar' },
-      { path: 'assignees', select: 'name email avatar' },
-      { path: 'list', select: 'title' }
-    ]);
+
+    return task.populate(TASK_POPULATE);
   }
 
   /**
-   * Delete task
+   * Delete Task
    */
   async deleteTask(taskId, userId) {
     const task = await this.getTaskById(taskId, userId);
 
-    await Task.findByIdAndDelete(task._id);
-    return { message: 'Task deleted successfully' };
+    await task.deleteOne();
+
+    return {
+      message: 'Task deleted successfully'
+    };
   }
 }
 
