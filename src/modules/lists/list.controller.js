@@ -4,7 +4,11 @@ const { sendResponse } = require('../../utils/response');
 
 class ListController {
   createList = catchAsync(async (req, res) => {
-    const list = await listService.createList(req.user.id, req.body);
+    const list = await listService.createList(
+      req.params.boardId,
+      req.user.id,
+      req.body
+    );
     return sendResponse(res, {
       statusCode: 201,
       message: 'List created successfully',
@@ -13,14 +17,10 @@ class ListController {
   });
 
   getListsByBoard = catchAsync(async (req, res) => {
-    const { boardId } = req.query;
-    if (!boardId) {
-      return res.status(400).json({
-        success: false,
-        message: 'boardId query parameter is required'
-      });
-    }
-    const lists = await listService.getListsByBoard(boardId, req.user.id);
+    const lists = await listService.getListsByBoard(
+      req.params.boardId,
+      req.user.id
+    );
     return sendResponse(res, {
       statusCode: 200,
       message: 'Lists retrieved successfully',

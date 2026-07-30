@@ -1,19 +1,43 @@
+const mongoose = require('mongoose');
 const List = require('./list.model');
 const boardService = require('../boards/board.service');
+
+const LIST_POPULATE = [
+  {
+    path: 'board',
+    select: 'title'
+  },
+  {
+    path: 'createdBy',
+    select: 'name email avatar'
+  }
+];
 
 class ListService {
   /**
    * Create a new list in a board
    */
-  async createList(userId, data) {
-    const { title, boardId, position } = data;
+  async createList(boardId, userId, data) {
+    const { title, position } = data;
 
     // Verify user access to the board
     await boardService.getBoardById(boardId, userId);
 
-    // Calculate position if not provided
+    // Prevent duplicate list titles in the same board
+    const existingList = await List.findOne({
+      board: boardId,
+      title
+    });
+
+    if (existingList) {
+      const error = new Error('List title already exists');
+      error.statusCode = 409;
+      throw error;
+    }
+
+    // Calculate position only when not explicitly provided
     let listPosition = position;
-    if (listPosition === undefined || listPosition === 0) {
+    if (listPosition === undefined) {
       const count = await List.countDocuments({ board: boardId });
       listPosition = count;
     }
@@ -21,10 +45,11 @@ class ListService {
     const list = await List.create({
       title,
       board: boardId,
+      createdBy: userId,
       position: listPosition
     });
 
-    return list;
+    return list.populate(LIST_POPULATE);
   }
 
   /**
@@ -41,6 +66,12 @@ class ListService {
    * Get list by ID
    */
   async getListById(listId, userId) {
+    if (!mongoose.Types.ObjectId.isValid(listId)) {
+      const error = new Error('Invalid list ID');
+      error.statusCode = 400;
+      throw error;
+    }
+
     const list = await List.findById(listId);
     if (!list) {
       const error = new Error('List not found');
@@ -59,7 +90,22 @@ class ListService {
   async updateList(listId, userId, updateData) {
     const list = await this.getListById(listId, userId);
 
-    Object.assign(list, updateData);
+    if (updateData.title !== undefined) {
+      list.title = updateData.title;
+    }
+
+    if (updateData.description !== undefined) {
+      list.description = updateData.description;
+    }
+
+    if (updateData.position !== undefined) {
+      list.position = updateData.position;
+    }
+
+    if (updateData.isArchived !== undefined) {
+      list.isArchived = updateData.isArchived;
+    }
+
     await list.save();
     return list;
   }
@@ -70,7 +116,7 @@ class ListService {
   async deleteList(listId, userId) {
     const list = await this.getListById(listId, userId);
 
-    await List.findByIdAndDelete(list._id);
+    await list.deleteOne();
     return { message: 'List deleted successfully' };
   }
 }

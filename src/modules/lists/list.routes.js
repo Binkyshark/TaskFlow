@@ -7,7 +7,7 @@ const {
   validateUpdateList
 } = require('./list.validation');
 
-const router = express.Router();
+const router = express.Router({ mergeParams: true });
 
 router.use(protect);
 

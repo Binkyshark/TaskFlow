@@ -25,10 +25,11 @@ router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/projects', projectRoutes);
 router.use('/boards', boardRoutes);
-router.use('/lists', listRoutes);
+router.use('/boards/:boardId/lists', listRoutes);
 router.use('/tasks', taskRoutes);
 router.use('/comments', commentRoutes);
 router.use('/attachments', attachmentRoutes);
 router.use('/notifications', notificationRoutes);
+router.use('/lists', listRoutes);
 
 module.exports = router;

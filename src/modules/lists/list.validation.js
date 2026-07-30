@@ -1,13 +1,9 @@
 const validateCreateList = (data) => {
   const errors = [];
-  const { title, boardId, position } = data || {};
+  const { title, position } = data || {};
 
   if (!title || typeof title !== 'string' || !title.trim()) {
     errors.push('List title is required');
-  }
-
-  if (!boardId) {
-    errors.push('boardId is required');
   }
 
   if (errors.length > 0) {
@@ -18,8 +14,7 @@ const validateCreateList = (data) => {
     value: {
       body: {
         title: title.trim(),
-        boardId,
-        position: position !== undefined ? Number(position) : 0
+        position: position !== undefined ? Number(position) : undefined
       }
     }
   };
