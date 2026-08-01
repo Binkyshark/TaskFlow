@@ -1,18 +1,7 @@
-const validateUploadAttachment = (data) => {
-  const errors = [];
-  const { taskId } = data || {};
-
-  if (!taskId) {
-    errors.push('taskId is required');
-  }
-
-  if (errors.length > 0) {
-    return { error: errors };
-  }
-
+const validateUploadAttachment = () => {
   return {
     value: {
-      body: { taskId }
+      body: {}
     }
   };
 };

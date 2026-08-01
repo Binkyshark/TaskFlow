@@ -3,11 +3,21 @@ const attachmentController = require('./attachment.controller');
 const { protect } = require('../../middlewares/auth.middleware');
 const validate = require('../../middlewares/validation.middleware');
 const { handleSingleUpload } = require('../../middlewares/upload.middleware');
-const { validateUploadAttachment } = require('./attachment.validation');
+const {
+  validateUploadAttachment
+} = require('./attachment.validation');
 
-const router = express.Router();
+const router = express.Router({
+  mergeParams: true
+});
 
 router.use(protect);
+
+/*
+|--------------------------------------------------------------------------
+| Nested Routes
+|--------------------------------------------------------------------------
+*/
 
 router.post(
   '/',
@@ -15,7 +25,26 @@ router.post(
   validate(validateUploadAttachment),
   attachmentController.uploadAttachment
 );
-router.get('/', attachmentController.getAttachmentsByTask);
-router.delete('/:id', attachmentController.deleteAttachment);
+
+router.get(
+  '/',
+  attachmentController.getAttachmentsByTask
+);
+
+/*
+|--------------------------------------------------------------------------
+| Standalone Routes
+|--------------------------------------------------------------------------
+*/
+
+router.get(
+  '/:id',
+  attachmentController.getAttachmentById
+);
+
+router.delete(
+  '/:id',
+  attachmentController.deleteAttachment
+);
 
 module.exports = router;

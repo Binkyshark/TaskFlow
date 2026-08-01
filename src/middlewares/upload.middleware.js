@@ -1,34 +1,51 @@
-const upload = require('../utils/upload');
 const multer = require('multer');
+const upload = require('../utils/upload');
 
 /**
- * Handle single file upload with error handling
- * @param {String} fieldName 
+ * Handle single file upload with centralized error handling.
+ *
+ * @param {string} fieldName
+ * @returns {Function}
  */
-const handleSingleUpload = (fieldName) => {
+const handleSingleUpload = (fieldName = 'file') => {
   return (req, res, next) => {
-    const singleUpload = upload.single(fieldName);
-
-    singleUpload(req, res, (err) => {
-      if (err instanceof multer.MulterError) {
-        if (err.code === 'LIMIT_FILE_SIZE') {
-          return res.status(400).json({
-            success: false,
-            message: 'File size limit exceeded.'
-          });
-        }
-        return res.status(400).json({
-          success: false,
-          message: `Upload error: ${err.message}`
-        });
-      } else if (err) {
-        return res.status(400).json({
-          success: false,
-          message: err.message
-        });
+    upload.single(fieldName)(req, res, (err) => {
+      if (!err) {
+        return next();
       }
 
-      next();
+      if (err instanceof multer.MulterError) {
+        switch (err.code) {
+          case 'LIMIT_FILE_SIZE':
+            return res.status(400).json({
+              success: false,
+              message: 'File size exceeds the allowed limit.'
+            });
+
+          case 'LIMIT_UNEXPECTED_FILE':
+            return res.status(400).json({
+              success: false,
+              message: 'Unexpected file field.'
+            });
+
+          case 'LIMIT_FILE_COUNT':
+            return res.status(400).json({
+              success: false,
+              message: 'Too many files uploaded.'
+            });
+
+          default:
+            return res.status(400).json({
+              success: false,
+              message: err.message
+            });
+        }
+      }
+
+      return res.status(400).json({
+        success: false,
+        message: err.message || 'File upload failed.'
+      });
     });
   };
 };
