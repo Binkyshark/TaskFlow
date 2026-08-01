@@ -7,13 +7,49 @@ const {
   validateUpdateComment
 } = require('./comment.validation');
 
-const router = express.Router();
+const router = express.Router({
+  mergeParams: true
+});
 
 router.use(protect);
 
-router.post('/', validate(validateCreateComment), commentController.createComment);
-router.get('/', commentController.getCommentsByTask);
-router.patch('/:id', validate(validateUpdateComment), commentController.updateComment);
-router.delete('/:id', commentController.deleteComment);
+/*
+|--------------------------------------------------------------------------
+| Nested Routes
+|--------------------------------------------------------------------------
+*/
+
+router.post(
+  '/',
+  validate(validateCreateComment),
+  commentController.createComment
+);
+
+router.get(
+  '/',
+  commentController.getCommentsByTask
+);
+
+/*
+|--------------------------------------------------------------------------
+| Standalone Routes
+|--------------------------------------------------------------------------
+*/
+
+router.get(
+  '/:id',
+  commentController.getCommentById
+);
+
+router.patch(
+  '/:id',
+  validate(validateUpdateComment),
+  commentController.updateComment
+);
+
+router.delete(
+  '/:id',
+  commentController.deleteComment
+);
 
 module.exports = router;
