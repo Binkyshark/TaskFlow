@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const { Comment } = require('./comment.model');
 const taskService = require('../tasks/task.service');
+const activityService = require('../activities/activity.service');
 
 const COMMENT_POPULATE = [
   {
@@ -21,7 +22,7 @@ class CommentService {
     const { content } = data;
 
     // Verify task exists and user has access
-    await taskService.getTaskById(taskId, userId);
+    const task = await taskService.getTaskById(taskId, userId);
 
     const comment = await Comment.create({
       content,
@@ -29,7 +30,15 @@ class CommentService {
       author: userId
     });
 
-    return comment.populate(COMMENT_POPULATE);
+    const populatedComment = await comment.populate(COMMENT_POPULATE);
+
+    await activityService.logCommentAdded(
+      userId,
+      populatedComment,
+      task
+    );
+
+    return populatedComment;
   }
 
   /**
@@ -104,6 +113,22 @@ class CommentService {
     }
 
     await comment.save();
+
+    if (typeof activityService.logCommentUpdated === 'function') {
+      await activityService.logCommentUpdated(
+        userId,
+        comment
+      );
+    } else {
+      await activityService.logActivity(userId, {
+        action: 'comment_updated',
+        entityType: 'comment',
+        entityId: comment._id,
+        task: comment.task?._id || comment.task,
+        comment: comment._id,
+        description: 'Comment was updated'
+      });
+    }
 
     return comment.populate(COMMENT_POPULATE);
   }

@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { Task } = require('./task.model');
 const listService = require('../lists/list.service');
 const { getPagination, getPagingData } = require('../../utils/pagination');
+const activityService = require('../activities/activity.service');
 
 const TASK_POPULATE = [
   {
@@ -67,7 +68,14 @@ class TaskService {
       position: taskPosition
     });
 
-    return task.populate(TASK_POPULATE);
+    const populatedTask = await task.populate(TASK_POPULATE);
+
+    await activityService.logTaskCreated(
+      userId,
+      populatedTask
+    );
+
+    return populatedTask;
   }
 
   /**
@@ -158,6 +166,17 @@ class TaskService {
   async updateTask(taskId, userId, updateData) {
     const task = await this.getTaskById(taskId, userId);
 
+    const previousList = task.list ? (task.list._id || task.list) : null;
+    const previousState = {
+      list: previousList,
+      title: task.title,
+      priority: task.priority,
+      assignees: Array.isArray(task.assignees)
+        ? task.assignees.map(a => (a._id || a || a.id).toString())
+        : [],
+      isCompleted: Boolean(task.isCompleted)
+    };
+
     if (updateData.listId) {
       const newList = await listService.getListById(
         updateData.listId,
@@ -211,7 +230,54 @@ class TaskService {
       task.isArchived = updateData.isArchived;
     }
 
+    if (updateData.isCompleted !== undefined) {
+      task.isCompleted = updateData.isCompleted;
+    }
+
     await task.save();
+
+    await activityService.logTaskUpdated(
+      userId,
+      task,
+      updateData,
+      previousState
+    );
+
+    const currentListStr = task.list ? (task.list._id || task.list).toString() : null;
+    const previousListStr = previousState.list ? (previousState.list._id || previousState.list).toString() : null;
+
+    if (previousListStr && currentListStr && previousListStr !== currentListStr) {
+      await activityService.logTaskMoved(
+        userId,
+        task,
+        previousState.list,
+        task.list
+      );
+    }
+
+    if (updateData.assignees !== undefined) {
+      const currentAssigneesStr = Array.isArray(task.assignees)
+        ? task.assignees.map(a => (a._id || a || a.id).toString())
+        : [];
+      const assigneesChanged =
+        previousState.assignees.length !== currentAssigneesStr.length ||
+        previousState.assignees.some(id => !currentAssigneesStr.includes(id));
+
+      if (assigneesChanged) {
+        await activityService.logTaskAssigned(
+          userId,
+          task,
+          task.assignees
+        );
+      }
+    }
+
+    if (!previousState.isCompleted && task.isCompleted === true) {
+      await activityService.logTaskCompleted(
+        userId,
+        task
+      );
+    }
 
     return task.populate(TASK_POPULATE);
   }

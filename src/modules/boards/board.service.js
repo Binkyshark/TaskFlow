@@ -1,5 +1,6 @@
 const Board = require('./board.model');
 const projectService = require('../projects/project.service');
+const activityService = require('../activities/activity.service');
 
 const BOARD_POPULATE = [
   {
@@ -49,7 +50,14 @@ class BoardService {
       position
     });
 
-    return board.populate(BOARD_POPULATE);
+    const populatedBoard = await board.populate(BOARD_POPULATE);
+
+    await activityService.logBoardCreated(
+      userId,
+      populatedBoard
+    );
+
+    return populatedBoard;
   }
 
   /**
@@ -117,6 +125,12 @@ class BoardService {
     }
 
     await board.save();
+
+    await activityService.logBoardUpdated(
+      userId,
+      board,
+      updateData
+    );
 
     return board.populate(BOARD_POPULATE);
   }

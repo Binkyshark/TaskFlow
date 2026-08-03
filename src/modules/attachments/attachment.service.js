@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 
 const { Attachment } = require('./attachment.model');
 const taskService = require('../tasks/task.service');
+const activityService = require('../activities/activity.service');
 
 const DELETED_FILE_NAME = 'Deleted Attachment';
 
@@ -30,7 +31,7 @@ class AttachmentService {
     }
 
     // Verify user can access task
-    await taskService.getTaskById(taskId, userId);
+    const task = await taskService.getTaskById(taskId, userId);
 
     const attachment = await Attachment.create({
       originalName: file.originalname,
@@ -43,7 +44,15 @@ class AttachmentService {
       uploadedBy: userId
     });
 
-    return attachment.populate(ATTACHMENT_POPULATE);
+    const populatedAttachment = await attachment.populate(ATTACHMENT_POPULATE);
+
+    await activityService.logAttachmentUploaded(
+      userId,
+      populatedAttachment,
+      task
+    );
+
+    return populatedAttachment;
   }
 
   /**
@@ -89,43 +98,44 @@ class AttachmentService {
 
     return attachment;
   }
-/*
- * Delete Attachment (Soft Delete)
- */
-async deleteAttachment(attachmentId, userId) {
-  const attachment = await this.getAttachmentById(
-    attachmentId,
-    userId
-  );
 
-  if (
-    attachment.uploadedBy._id.toString() !==
-    userId.toString()
-  ) {
-    const error = new Error(
-      'Only the uploader can delete this attachment'
+  /**
+   * Delete Attachment (Soft Delete)
+   */
+  async deleteAttachment(attachmentId, userId) {
+    const attachment = await this.getAttachmentById(
+      attachmentId,
+      userId
     );
-    error.statusCode = 403;
-    throw error;
+
+    if (
+      attachment.uploadedBy._id.toString() !==
+      userId.toString()
+    ) {
+      const error = new Error(
+        'Only the uploader can delete this attachment'
+      );
+      error.statusCode = 403;
+      throw error;
+    }
+
+    // Delete physical file
+    if (
+      attachment.url &&
+      fs.existsSync(attachment.url)
+    ) {
+      fs.unlinkSync(attachment.url);
+    }
+
+    // Soft delete
+    attachment.isDeleted = true;
+
+    await attachment.save();
+
+    return {
+      message: 'Attachment deleted successfully'
+    };
   }
-
-  // Delete physical file
-  if (
-    attachment.url &&
-    fs.existsSync(attachment.url)
-  ) {
-    fs.unlinkSync(attachment.url);
-  }
-
-  // Soft delete
-  attachment.isDeleted = true;
-
-  await attachment.save();
-
-  return {
-    message: 'Attachment deleted successfully'
-  };
-}
 }
 
 module.exports = new AttachmentService();

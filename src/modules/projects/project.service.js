@@ -2,6 +2,8 @@ const { Project } = require('./project.model');
 const { getPagination, getPagingData } = require('../../utils/pagination');
 const { User } = require('../users/user.model');
 const mongoose = require('mongoose');
+const activityService = require('../activities/activity.service');
+
 class ProjectService {
   /**
    * Create a new project
@@ -13,10 +15,17 @@ class ProjectService {
       members: [{ user: userId, role: 'admin' }]
     });
 
-    return project.populate([
+    const populatedProject = await project.populate([
       { path: 'owner', select: 'name email avatar' },
       { path: 'members.user', select: 'name email avatar' }
     ]);
+
+    await activityService.logProjectCreated(
+      userId,
+      populatedProject
+    );
+
+    return populatedProject;
   }
 
   /**
@@ -86,7 +95,6 @@ class ProjectService {
     return project;
   }
 
-
   /**
    * Update project details
    */
@@ -101,7 +109,6 @@ class ProjectService {
       throw error;
     }
 
-    // Object.assign(project, updateData);
     if (updateData.name !== undefined) {
       project.name = updateData.name;
     }
@@ -113,7 +120,22 @@ class ProjectService {
     if (updateData.isArchived !== undefined) {
       project.isArchived = updateData.isArchived;
     }
+
     await project.save();
+
+    await activityService.logProjectUpdated(
+      userId,
+      project,
+      updateData
+    );
+
+    if (updateData.isArchived === true) {
+      await activityService.logProjectArchived(
+        userId,
+        project
+      );
+    }
+
     return project;
   }
 

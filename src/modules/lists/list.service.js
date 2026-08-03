@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const List = require('./list.model');
 const boardService = require('../boards/board.service');
+const activityService = require('../activities/activity.service');
 
 const LIST_POPULATE = [
   {
@@ -49,7 +50,14 @@ class ListService {
       position: listPosition
     });
 
-    return list.populate(LIST_POPULATE);
+    const populatedList = await list.populate(LIST_POPULATE);
+
+    await activityService.logListCreated(
+      userId,
+      populatedList
+    );
+
+    return populatedList;
   }
 
   /**
@@ -107,6 +115,13 @@ class ListService {
     }
 
     await list.save();
+
+    await activityService.logListUpdated(
+      userId,
+      list,
+      updateData
+    );
+
     return list;
   }
 
