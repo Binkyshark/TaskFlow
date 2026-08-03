@@ -9,6 +9,7 @@ const commentRoutes = require('../modules/comments/comment.routes');
 const attachmentRoutes = require('../modules/attachments/attachment.routes');
 const notificationRoutes = require('../modules/notifications/notification.routes');
 const activityRoutes = require('../modules/activities/activity.routes');
+const dashboardRoutes = require('../modules/dashboard/dashboard.routes');
 const router = express.Router();
 
 // Health Check Route
@@ -38,4 +39,5 @@ router.use('/activities', activityRoutes);
 router.use('/projects/:projectId/activities', activityRoutes);
 router.use('/boards/:boardId/activities', activityRoutes);
 router.use('/tasks/:taskId/activities', activityRoutes);
+router.use('/dashboard', dashboardRoutes);
 module.exports = router;
