@@ -8,7 +8,7 @@ const taskRoutes = require('../modules/tasks/task.routes');
 const commentRoutes = require('../modules/comments/comment.routes');
 const attachmentRoutes = require('../modules/attachments/attachment.routes');
 const notificationRoutes = require('../modules/notifications/notification.routes');
-
+const activityRoutes = require('../modules/activities/activity.routes');
 const router = express.Router();
 
 // Health Check Route
@@ -26,9 +26,6 @@ router.use('/users', userRoutes);
 router.use('/projects', projectRoutes);
 router.use('/boards', boardRoutes);
 router.use('/boards/:boardId/lists', listRoutes);
-// router.use('/tasks', taskRoutes);
-// router.use('/comments', commentRoutes);
-// router.use('/attachments', attachmentRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/lists', listRoutes);
 router.use('/lists/:listId/tasks', taskRoutes);
@@ -37,4 +34,8 @@ router.use('/comments', commentRoutes);
 router.use('/tasks', taskRoutes);
 router.use('/tasks/:taskId/attachments', attachmentRoutes);
 router.use('/attachments', attachmentRoutes);
+router.use('/activities', activityRoutes);
+router.use('/projects/:projectId/activities', activityRoutes);
+router.use('/boards/:boardId/activities', activityRoutes);
+router.use('/tasks/:taskId/activities', activityRoutes);
 module.exports = router;
